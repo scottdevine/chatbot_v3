@@ -290,791 +290,220 @@ flowchart TD
     
     Sufficient --> Finisher[Forward to Finishing Agent]
 ```
+## 5. Storage Requirements
 
-## 4. Detailed API Specifications
+### 5.1 Vector Database
+- **Technology**: Chroma or Qdrant
+- **Performance Requirements**:
+  - Query latency: <200ms for typical queries
+  - Indexing throughput: Support for batch processing
+- **Features**:
+  - Multi-tenant support for topic-specific stores
+  - Metadata filtering
+  - Hybrid search (vector + keyword)
 
-### 4.1 Internal APIs
+### 5.2 Document Storage
+- **Technology**: File system or object storage
+- **Storage Requirements**:
+  - Original documents: Variable size (typically 100KB-10MB per document)
+  - Extracted text: ~20% of original document size
+- **Features**:
+  - Version control for document updates
+  - Access control based on user permissions
+  - Backup and recovery mechanisms
 
-#### Central Agent API
+### 5.3 Conversation Storage
+- **Technology**: Document database (e.g., MongoDB)
+- **Storage Requirements**:
+  - Conversation history: ~5KB per exchange
+  - User preferences: ~1KB per user
+- **Features**:
+  - Time-based retention policies
+  - User-specific history access
+  - Search capabilities for past conversations
 
-**Endpoint**: `/api/agent/central`
+### 5.4 Cache Storage
+- **Technology**: In-memory cache (e.g., Redis)
+- **Storage Requirements**:
+  - Query results: ~10-50KB per query
+  - Tool outputs: ~5-20KB per tool execution
+- **Features**:
+  - Time-based expiration
+  - LRU eviction policies
+  - Distributed caching for scalability
 
-**Method**: POST
+## 6. Deployment Architecture
 
-**Request Body**:
-```json
-{
-  "query": "User query text",
-  "conversation_id": "unique_conversation_id",
-  "user_id": "user_identifier",
-  "preferences": {
-    "model_provider": "openai|anthropic|google",
-    "model_name": "gpt-4|claude-3|gemini-pro",
-    "vector_stores": ["store_id_1", "store_id_2"],
-    "citation_format": "apa|mla|chicago",
-    "response_length": "concise|detailed",
-    "include_tool_details": true
-  },
-  "context": {
-    "previous_messages": [
-      {
-        "role": "user|assistant",
-        "content": "Message content",
-        "timestamp": "2023-04-03T21:30:00Z"
-      }
-    ],
-    "user_profile": {
-      "expertise_level": "beginner|intermediate|expert",
-      "preferred_topics": ["topic1", "topic2"]
-    }
-  }
-}
+```mermaid
+graph TD
+    subgraph "User's Local Machine"
+        WebUI[Web UI Container]
+        AgentService[Agent Service Container]
+        VectorDB[Vector Database Container]
+        DocStorage[Document Storage Container]
+    end
+    
+    subgraph "External Services"
+        PubMedAPI[PubMed API]
+        SearchAPI[Search Engine API]
+        LLMAPI[LLM API Services]
+    end
+    
+    WebUI -->|HTTP/WebSocket| AgentService
+    AgentService -->|Query| VectorDB
+    AgentService -->|Store/Retrieve| DocStorage
+    AgentService -->|API Calls| PubMedAPI
+    AgentService -->|API Calls| SearchAPI
+    AgentService -->|API Calls| LLMAPI
 ```
 
-**Response Body**:
-```json
-{
-  "query_id": "unique_query_id",
-  "status": "processing|completed|failed",
-  "plan": {
-    "strategy": "Description of approach",
-    "reasoning": "Explanation of strategy selection",
-    "selected_tools": [
-      {
-        "tool_id": "vector_search",
-        "reason": "Explanation for selecting this tool",
-        "parameters": {
-          "query": "Transformed query for vector search",
-          "store_ids": ["store_id_1"]
-        }
-      },
-      {
-        "tool_id": "pubmed",
-        "reason": "Explanation for selecting this tool",
-        "parameters": {
-          "query": "Transformed query for PubMed"
-        }
-      }
-    ]
-  },
-  "estimated_completion_time": "2023-04-03T21:45:00Z"
-}
-```
+### 6.1 Docker Containers
 
-**Error Responses**:
-- 400 Bad Request: Invalid query or missing required parameters
-- 401 Unauthorized: Authentication failure
-- 500 Internal Server Error: Processing error
+#### Web UI Container
+- **Components**:
+  - Web server (Nginx)
+  - Frontend application (React/Vue)
+  - WebSocket server for real-time updates
+- **Resource Requirements**:
+  - CPU: 1 core
+  - Memory: 1GB
+  - Storage: 1GB
 
-#### Tool Orchestrator API
+#### Agent Service Container
+- **Components**:
+  - API server (FastAPI/Flask)
+  - Agent orchestration service
+  - Tool connectors
+  - Context processing services
+- **Resource Requirements**:
+  - CPU: 2-4 cores
+  - Memory: 4-8GB
+  - Storage: 10GB
 
-**Endpoint**: `/api/tools/execute`
+#### Vector Database Container
+- **Components**:
+  - Chroma or Qdrant instance
+  - Embedding service
+- **Resource Requirements**:
+  - CPU: 2-4 cores
+  - Memory: 4-16GB (depending on index size)
+  - Storage: 50-500GB (depending on document volume)
 
-**Method**: POST
+#### Document Storage Container
+- **Components**:
+  - Document database
+  - File storage service
+- **Resource Requirements**:
+  - CPU: 1-2 cores
+  - Memory: 2-4GB
+  - Storage: 100GB-1TB (depending on document volume)
 
-**Request Body**:
-```json
-{
-  "query_id": "unique_query_id",
-  "execution_strategy": "parallel|sequential|hybrid",
-  "timeout": 30,
-  "tools": [
-    {
-      "tool_id": "vector_search",
-      "priority": 1,
-      "parameters": {
-        "query": "Transformed query for vector search",
-        "store_ids": ["store_id_1", "store_id_2"],
-        "limit": 10,
-        "similarity_threshold": 0.75,
-        "include_metadata": true
-      }
-    },
-    {
-      "tool_id": "pubmed",
-      "priority": 2,
-      "parameters": {
-        "query": "Transformed query for PubMed",
-        "max_results": 5,
-        "date_range": {
-          "start": "2020-01-01",
-          "end": "2023-04-03"
-        },
-        "article_types": ["clinical_trial", "review"]
-      }
-    },
-    {
-      "tool_id": "web_search",
-      "priority": 3,
-      "parameters": {
-        "query": "Transformed query for web search",
-        "max_results": 5,
-        "recency": "past_year",
-        "site_restrictions": ["example.com", "example.org"]
-      }
-    }
-  ]
-}
-```
+### 6.2 Networking
 
-**Response Body**:
-```json
-{
-  "query_id": "unique_query_id",
-  "status": "completed|partial|failed",
-  "execution_time": 2.45,
-  "results": {
-    "vector_search": {
-      "status": "completed",
-      "execution_time": 0.85,
-      "results": [
-        {
-          "document_id": "doc123",
-          "chunk_id": "chunk456",
-          "content": "Relevant text from document",
-          "similarity_score": 0.92,
-          "metadata": {
-            "title": "Document Title",
-            "author": "Author Name",
-            "date": "2022-05-15",
-            "source": "Internal Document",
-            "file_name": "document.pdf",
-            "page_number": 42
-          }
-        }
-      ],
-      "total_results_found": 25,
-      "results_returned": 10
-    },
-    "pubmed": {
-      "status": "completed",
-      "execution_time": 1.2,
-      "results": [
-        {
-          "pmid": "12345678",
-          "title": "Article Title",
-          "abstract": "Article abstract text",
-          "authors": ["Author 1", "Author 2"],
-          "journal": "Journal Name",
-          "publication_date": "2022-03-10",
-          "doi": "10.1234/example.12345",
-          "url": "https://pubmed.ncbi.nlm.nih.gov/12345678/"
-        }
-      ],
-      "total_results_found": 42,
-      "results_returned": 5
-    },
-    "web_search": {
-      "status": "completed",
-      "execution_time": 1.8,
-      "results": [
-        {
-          "title": "Web Page Title",
-          "url": "https://example.com/page",
-          "snippet": "Relevant snippet from the web page",
-          "published_date": "2023-01-15",
-          "extracted_content": "Full extracted content from the page"
-        }
-      ],
-      "total_results_found": 1250,
-      "results_returned": 5
-    }
-  },
-  "failed_tools": [],
-  "warnings": []
-}
-```
+- **Internal Communication**:
+  - Docker network for inter-container communication
+  - REST APIs and gRPC for service-to-service communication
+  - WebSockets for real-time updates to UI
 
-**Error Responses**:
-- 400 Bad Request: Invalid tool configuration
-- 404 Not Found: Query ID not found
-- 408 Request Timeout: Tool execution exceeded timeout
-- 500 Internal Server Error: Execution error
+- **External Communication**:
+  - HTTPS for all external API calls
+  - API key authentication for external services
+  - Rate limiting for external API usage
 
-#### Context Aggregator API
+### 6.3 Scalability Considerations
 
-**Endpoint**: `/api/context/aggregate`
+- **Horizontal Scaling**:
+  - Stateless components (Agent Service) can be replicated
+  - Load balancing for distributed deployments
 
-**Method**: POST
+- **Vertical Scaling**:
+  - Vector database can be scaled with more memory/CPU
+  - Document storage can be expanded with additional disk space
 
-**Request Body**:
-```json
-{
-  "query_id": "unique_query_id",
-  "original_query": "User query text",
-  "tool_results": {
-    "tool_id_1": { ... tool specific results ... },
-    "tool_id_2": { ... tool specific results ... }
-  },
-  "aggregation_strategy": {
-    "deduplication": true,
-    "relevance_threshold": 0.6,
-    "max_context_items": 20,
-    "prioritize_recent": true
-  }
-}
-```
+- **Resource Optimization**:
+  - Caching frequently used embeddings and query results
+  - Batch processing for document indexing
+  - Asynchronous processing for non-blocking operations
 
-**Response Body**:
-```json
-{
-  "query_id": "unique_query_id",
-  "aggregated_context": [
-    {
-      "content": "Context item text",
-      "source": {
-        "tool_id": "vector_search",
-        "document_id": "doc123",
-        "chunk_id": "chunk456",
-        "metadata": { ... source metadata ... }
-      },
-      "relevance_score": 0.92,
-      "citation_id": "citation_1"
-    }
-  ],
-  "context_stats": {
-    "total_items_before_filtering": 45,
-    "items_after_deduplication": 32,
-    "items_after_relevance_filtering": 20,
-    "sources_distribution": {
-      "vector_search": 12,
-      "pubmed": 5,
-      "web_search": 3
-    }
-  },
-  "suggested_follow_up_queries": [
-    "Suggested follow-up query 1",
-    "Suggested follow-up query 2"
-  ]
-}
-```
+## 7. Security Considerations
 
-**Error Responses**:
-- 400 Bad Request: Invalid aggregation parameters
-- 404 Not Found: Query ID not found
-- 500 Internal Server Error: Aggregation error
+### 7.1 Authentication and Authorization
+- User authentication via standard protocols (OAuth, JWT)
+- Role-based access control for document management
+- API key management for external service access
 
-#### Evaluator Agent API
+### 7.2 Data Protection
+- Encryption of sensitive data at rest
+- Secure communication channels (TLS/SSL)
+- Data minimization in LLM prompts
 
-**Endpoint**: `/api/agent/evaluator`
+### 7.3 Privacy Considerations
+- User consent for data processing
+- Audit logging of all system actions
+- Ability to delete user data and conversation history
 
-**Method**: POST
+### 7.4 LLM Security
+- Prompt injection prevention
+- Output filtering for sensitive information
+- Regular security audits of model behavior
 
-**Request Body**:
-```json
-{
-  "query_id": "unique_query_id",
-  "original_query": "User query text",
-  "aggregated_context": [
-    {
-      "content": "Context item text",
-      "source": { ... source information ... },
-      "relevance_score": 0.92,
-      "citation_id": "citation_1"
-    }
-  ],
-  "preferences": {
-    "model_provider": "openai|anthropic|google",
-    "model_name": "gpt-4|claude-3|gemini-pro",
-    "evaluation_strictness": "lenient|standard|strict"
-  }
-}
-```
+### 7.5 Container Security
+- Regular security updates for container images
+- Principle of least privilege for container permissions
+- Network policy enforcement between containers
 
-**Response Body**:
-```json
-{
-  "query_id": "unique_query_id",
-  "is_sufficient": true|false,
-  "confidence_score": 0.85,
-  "evaluation_details": {
-    "relevance_assessment": {
-      "score": 0.9,
-      "explanation": "The context contains highly relevant information about..."
-    },
-    "completeness_assessment": {
-      "score": 0.8,
-      "explanation": "The context covers most aspects of the query, but lacks..."
-    },
-    "reliability_assessment": {
-      "score": 0.85,
-      "explanation": "The sources are generally reliable, with information from..."
-    }
-  },
-  "missing_information": [
-    {
-      "description": "Information about specific treatment outcomes",
-      "importance": "high|medium|low"
-    }
-  ],
-  "suggested_tools": [
-    {
-      "tool_id": "pubmed",
-      "parameters": {
-        "query": "Refined query for PubMed",
-        "filters": { ... suggested filters ... }
-      },
-      "reason": "To find specific treatment outcome studies"
-    }
-  ],
-  "suggested_query_reformulations": [
-    "Suggested query reformulation 1",
-    "Suggested query reformulation 2"
-  ]
-}
-```
+## 8. Implementation Roadmap
 
-**Error Responses**:
-- 400 Bad Request: Invalid evaluation parameters
-- 404 Not Found: Query ID not found
-- 500 Internal Server Error: Evaluation error
+### Phase 1: Core Infrastructure (Weeks 1-3)
+- Set up Docker environment
+- Implement basic web UI
+- Deploy vector database
+- Create document storage system
+- Implement authentication system
 
-#### Finishing Agent API
+### Phase 2: Agent Framework (Weeks 4-6)
+- Implement Central AI Agent
+- Develop Tool Orchestrator
+- Create basic tool connectors (vector search, web search)
+- Build Context Aggregator
+- Implement API server
 
-**Endpoint**: `/api/agent/finisher`
+### Phase 3: Advanced Features (Weeks 7-9)
+- Implement Evaluator and Finishing Agents
+- Add PubMed and structured database connectors
+- Develop citation and source tracking
+- Create document upload and management interface
+- Implement conversation history
 
-**Method**: POST
+### Phase 4: Refinement and Optimization (Weeks 10-12)
+- Optimize query performance
+- Enhance user interface
+- Implement advanced caching
+- Add monitoring and analytics
+- Conduct security audit
 
-**Request Body**:
-```json
-{
-  "query_id": "unique_query_id",
-  "original_query": "User query text",
-  "aggregated_context": [
-    {
-      "content": "Context item text",
-      "source": { ... source information ... },
-      "relevance_score": 0.92,
-      "citation_id": "citation_1"
-    }
-  ],
-  "preferences": {
-    "model_provider": "openai|anthropic|google",
-    "model_name": "gpt-4|claude-3|gemini-pro",
-    "citation_format": "apa|mla|chicago",
-    "response_length": "concise|detailed",
-    "include_uncertainty": true,
-    "language_style": "formal|conversational"
-  }
-}
-```
+## 9. Monitoring and Maintenance
 
-**Response Body**:
-```json
-{
-  "query_id": "unique_query_id",
-  "answer": {
-    "text": "Formatted answer text with inline citation markers[1][2]",
-    "sections": [
-      {
-        "type": "introduction",
-        "content": "Introduction text"
-      },
-      {
-        "type": "main_content",
-        "content": "Main content with citations[1]"
-      },
-      {
-        "type": "conclusion",
-        "content": "Conclusion text"
-      }
-    ]
-  },
-  "citations": [
-    {
-      "id": "1",
-      "text": "Formatted citation for source 1",
-      "source": {
-        "tool_id": "vector_search",
-        "document_id": "doc123",
-        "metadata": { ... source metadata ... }
-      },
-      "url": "Optional URL"
-    },
-    {
-      "id": "2",
-      "text": "Formatted citation for source 2",
-      "source": {
-        "tool_id": "pubmed",
-        "pmid": "12345678",
-        "metadata": { ... source metadata ... }
-      },
-      "url": "https://pubmed.ncbi.nlm.nih.gov/12345678/"
-    }
-  ],
-  "tools_used": [
-    {
-      "tool_id": "vector_search",
-      "store_ids": ["store_id_1"],
-      "result_count": 5,
-      "contribution_score": 0.7
-    },
-    {
-      "tool_id": "pubmed",
-      "result_count": 3,
-      "contribution_score": 0.3
-    }
-  ],
-  "confidence_assessment": {
-    "overall_confidence": "high|medium|low",
-    "uncertain_aspects": [
-      {
-        "description": "The exact efficacy rate of the treatment",
-        "reason": "Studies show varying results between 65-80%"
-      }
-    ]
-  },
-  "follow_up_suggestions": [
-    "Suggested follow-up query 1",
-    "Suggested follow-up query 2"
-  ]
-}
-```
+### 9.1 System Monitoring
+- Container health and resource usage
+- API performance metrics
+- Error rate tracking
+- Query latency monitoring
 
-**Error Responses**:
-- 400 Bad Request: Invalid finishing parameters
-- 404 Not Found: Query ID not found
-- 500 Internal Server Error: Finishing error
+### 9.2 LLM Performance Monitoring
+- Response quality assessment
+- Hallucination detection rates
+- Citation accuracy tracking
+- User feedback collection
 
-### 4.2 External APIs
+### 9.3 Maintenance Procedures
+- Regular vector database reindexing
+- LLM prompt optimization
+- External API integration updates
+- Security patches and updates
 
-#### User Query API
-
-**Endpoint**: `/api/query`
-
-**Method**: POST
-
-**Request Body**:
-```json
-{
-  "query": "User query text",
-  "conversation_id": "unique_conversation_id",
-  "preferences": {
-    "model_provider": "openai|anthropic|google",
-    "model_name": "gpt-4|claude-3|gemini-pro",
-    "vector_stores": ["store_id_1", "store_id_2"],
-    "citation_format": "apa|mla|chicago",
-    "response_length": "concise|detailed",
-    "include_tool_details": true
-  }
-}
-```
-
-**Response Body**:
-```json
-{
-  "query_id": "unique_query_id",
-  "status": "processing",
-  "estimated_completion_time": "2023-04-03T21:45:00Z"
-}
-```
-
-**Error Responses**:
-- 400 Bad Request: Invalid query
-- 401 Unauthorized: Authentication failure
-- 500 Internal Server Error: Processing error
-
-#### Query Status API
-
-**Endpoint**: `/api/query/{query_id}/status`
-
-**Method**: GET
-
-**Response Body**:
-```json
-{
-  "query_id": "unique_query_id",
-  "status": "processing|completed|failed",
-  "progress": 0.75,
-  "current_stage": "tool_execution|context_aggregation|evaluation|finishing",
-  "estimated_completion_time": "2023-04-03T21:45:00Z",
-  "tools_status": [
-    {
-      "tool_id": "vector_search",
-      "status": "completed|processing|pending|failed",
-      "progress": 1.0
-    },
-    {
-      "tool_id": "pubmed",
-      "status": "processing",
-      "progress": 0.5
-    }
-  ]
-}
-```
-
-**Error Responses**:
-- 404 Not Found: Query ID not found
-- 500 Internal Server Error: Status retrieval error
-
-#### Query Result API
-
-**Endpoint**: `/api/query/{query_id}/result`
-
-**Method**: GET
-
-**Response Body**:
-```json
-{
-  "query_id": "unique_query_id",
-  "original_query": "User query text",
-  "answer": {
-    "text": "Formatted answer text with inline citation markers[1][2]",
-    "sections": [
-      {
-        "type": "introduction",
-        "content": "Introduction text"
-      },
-      {
-        "type": "main_content",
-        "content": "Main content with citations[1]"
-      },
-      {
-        "type": "conclusion",
-        "content": "Conclusion text"
-      }
-    ]
-  },
-  "citations": [
-    {
-      "id": "1",
-      "text": "Formatted citation for source 1",
-      "source": {
-        "tool_id": "vector_search",
-        "document_id": "doc123",
-        "metadata": { ... source metadata ... }
-      },
-      "url": "Optional URL"
-    },
-    {
-      "id": "2",
-      "text": "Formatted citation for source 2",
-      "source": {
-        "tool_id": "pubmed",
-        "pmid": "12345678",
-        "metadata": { ... source metadata ... }
-      },
-      "url": "https://pubmed.ncbi.nlm.nih.gov/12345678/"
-    }
-  ],
-  "tools_used": [
-    {
-      "tool_id": "vector_search",
-      "store_ids": ["store_id_1"],
-      "result_count": 5,
-      "contribution_score": 0.7
-    },
-    {
-      "tool_id": "pubmed",
-      "result_count": 3,
-      "contribution_score": 0.3
-    }
-  ],
-  "confidence_assessment": {
-    "overall_confidence": "high|medium|low",
-    "uncertain_aspects": [
-      {
-        "description": "The exact efficacy rate of the treatment",
-        "reason": "Studies show varying results between 65-80%"
-      }
-    ]
-  },
-  "follow_up_suggestions": [
-    "Suggested follow-up query 1",
-    "Suggested follow-up query 2"
-  ],
-  "conversation_id": "unique_conversation_id",
-  "timestamp": "2023-04-03T21:45:00Z",
-  "processing_time": 3.2
-}
-```
-
-**Error Responses**:
-- 404 Not Found: Query ID not found
-- 500 Internal Server Error: Result retrieval error
-
-#### Document Upload API
-
-**Endpoint**: `/api/documents/upload`
-
-**Method**: POST
-
-**Request Body**:
-```json
-{
-  "store_id": "store_id_1",
-  "documents": [
-    {
-      "file_name": "document.pdf",
-      "file_content": "base64_encoded_content",
-      "metadata": {
-        "title": "Document Title",
-        "author": "Author Name",
-        "date": "2023-01-15",
-        "tags": ["tag1", "tag2"],
-        "description": "Document description",
-        "source": "Document source",
-        "custom_fields": {
-          "field1": "value1",
-          "field2": "value2"
-        }
-      },
-      "processing_options": {
-        "chunk_size": 1000,
-        "chunk_overlap": 200,
-        "extract_images": true,
-        "ocr_enabled": true,
-        "language": "en"
-      }
-    }
-  ],
-  "batch_id": "optional_batch_identifier"
-}
-```
-
-**Response Body**:
-```json
-{
-  "job_id": "unique_job_id",
-  "status": "processing",
-  "document_count": 1,
-  "estimated_completion_time": "2023-04-03T22:00:00Z",
-  "documents_status": [
-    {
-      "file_name": "document.pdf",
-      "status": "processing",
-      "document_id": "doc123"
-    }
-  ]
-}
-```
-
-**Error Responses**:
-- 400 Bad Request: Invalid document format
-- 401 Unauthorized: Authentication failure
-- 413 Payload Too Large: Document size exceeds limit
-- 500 Internal Server Error: Processing error
-
-#### Vector Store Management API
-
-**Endpoint**: `/api/vector-stores/create`
-
-**Method**: POST
-
-**Request Body**:
-```json
-{
-  "name": "Medical Literature",
-  "description": "Vector store for medical research papers",
-  "embedding_model": "openai|sentence-transformers|...",
-  "embedding_model_version": "text-embedding-3-large",
-  "metadata_schema": {
-    "required": ["title", "date"],
-    "properties": {
-      "title": {"type": "string"},
-      "author": {"type": "string"},
-      "date": {"type": "string", "format": "date"},
-      "tags": {"type": "array", "items": {"type": "string"}},
-      "source": {"type": "string"},
-      "publication": {"type": "string"},
-      "custom_fields": {
-        "type": "object",
-        "additionalProperties": true
-      }
-    }
-  },
-  "access_control": {
-    "owner": "user_id",
-    "visibility": "private|shared|public",
-    "shared_with": ["user_id_1", "user_id_2"]
-
-**Method**: POST
-
-**Request Body**:
-```json
-{
-  "store_id": "store_id_1",
-  "documents": [
-    {
-      "file_name": "document.pdf",
-      "file_content": "base64_encoded_content",
-      "metadata": {
-        "title": "Document Title",
-        "author": "Author Name",
-        "date": "2023-01-15",
-        "tags": ["tag1", "tag2"],
-        "description": "Document description",
-        "source": "Document source",
-        "custom_fields": {
-          "field1": "value1",
-          "field2": "value2"
-        }
-      },
-      "processing_options": {
-        "chunk_size": 1000,
-        "chunk_overlap": 200,
-        "extract_images": true,
-        "ocr_enabled": true,
-        "language": "en"
-      }
-    }
-  ],
-  "batch_id": "optional_batch_identifier"
-}
-```
-
-**Response Body**:
-```json
-{
-  "job_id": "unique_job_id",
-  "status": "processing",
-  "document_count": 1,
-  "estimated_completion_time": "2023-04-03T22:00:00Z",
-  "documents_status": [
-    {
-      "file_name": "document.pdf",
-      "status": "processing",
-      "document_id": "doc123"
-    }
-  ]
-}
-```
-
-**Error Responses**:
-- 400 Bad Request: Invalid document format
-- 401 Unauthorized: Authentication failure
-- 413 Payload Too Large: Document size exceeds limit
-- 500 Internal Server Error: Processing error
-
-#### Vector Store Management API
-
-**Endpoint**: `/api/vector-stores/create`
-
-**Method**: POST
-
-**Request Body**:
-```json
-{
-  "name": "Medical Literature",
-  "description": "Vector store for medical research papers",
-  "embedding_model": "openai|sentence-transformers|...",
-  "embedding_model_version": "text-embedding-3-large",
-  "metadata_schema": {
-    "required": ["title", "date"],
-    "properties": {
-      "title": {"type": "string"},
-      "author": {"type": "string"},
-      "date": {"type": "string", "format": "date"},
-      "tags": {"type": "array", "items": {"type": "string"}},
-      "source": {"type": "string"},
-      "publication": {"type": "string"},
-      "custom_fields": {
-        "type": "object",
-        "additionalProperties": true
-      }
-    }
-  },
-  "access_control": {
-    "owner": "user_id",
-    "visibility": "private|shared|public",
-    "shared_with": ["user_id_1", "user_id_2"]
+### 9.4 Analytics and Reporting
+- Usage statistics dashboard
+- Query pattern analysis
+- Document utilization metrics
+- Performance trend reporting
