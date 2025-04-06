@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG Chatbot</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 20px;
+        }
+        #chatbox {
+            margin-top: 20px;
+            border: 1px solid #ccc;
+            padding: 10px;
+            min-height: 100px;
+            background-color: #f9f9f9;
+        }
+        #queryInput {
+            width: 80%;
+            padding: 8px;
+            margin-right: 5px;
+        }
+        button {
+            padding: 8px 15px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>RAG Chatbot Interface</h1>
+
+    <form id="chatForm">
+        <input type="text" id="queryInput" placeholder="Enter your query here..." required>
+        <button type="submit">Send</button>
+    </form>
+
+    <h2>Response:</h2>
+    <div id="chatbox">
+        <!-- Chatbot response will appear here -->
+    </div>
+
+    <script>
+        document.getElementById('chatForm').addEventListener('submit', async function(event) {
+            event.preventDefault(); // Prevent default form submission
+
+            const queryInput = document.getElementById('queryInput');
+            const chatbox = document.getElementById('chatbox');
+            const userQuery = queryInput.value.trim();
+
+            if (!userQuery) {
+                return; // Don't send empty queries
+            }
+
+            // Display user query
+            chatbox.innerHTML += `<p><strong>You:</strong> ${userQuery}</p>`;
+
+            // Clear input field
+            queryInput.value = '';
+
+            // Show loading indicator (optional)
+            // chatbox.innerHTML = '<p><i>Thinking...</i></p>';
+
+            try {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ query: userQuery }),
+                });
+
+                if (!response.ok) {
+                    // Try to get error message from response body
+                    let errorMsg = `HTTP error! status: ${response.status}`;
+                    try {
+                        const errorData = await response.json();
+                        errorMsg = errorData.error || errorMsg;
+                    } catch (e) {
+                        // Ignore if response is not JSON
+                    }
+                    throw new Error(errorMsg);
+                }
+
+                const data = await response.json();
+
+                // Display chatbot response
+                if (data.tools && data.tools.length > 0) {
+                    chatbox.innerHTML += `<p><strong>Tools Used:</strong> ${data.tools.join(', ')}</p>`;
+                }
+                chatbox.innerHTML += `<p><strong>Chatbot:</strong> ${data.response || 'No response received.'}</p>`;
+
+                // Display sources
+                if (data.sources && data.sources.length > 0) {
+                    const sourcesDiv = document.createElement('div');
+                    sourcesDiv.textContent = "Sources: " + data.sources.join(", ");
+                    chatbox.appendChild(sourcesDiv);
+                }
+
+                // Display history
+                if (data.history) {
+                    data.history.forEach(message => {
+                        chatbox.innerHTML += `<p><strong>${message[0] === userQuery ? 'You:' : 'Chatbot:'}</strong> ${message[1]}</p>`;
+                    });
+                }
+
+            } catch (error) {
+                console.error('Error sending query:', error);
+                chatbox.innerHTML += `<p style="color: red;"><strong>Error:</strong> ${error.message}</p>`;
+            }
+        });
+    </script>
+
+    </body>
+</html>

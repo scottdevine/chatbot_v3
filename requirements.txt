@@ -1,0 +1,4 @@
+biopython
+chromadb
+Flask
+beautifulsoup4

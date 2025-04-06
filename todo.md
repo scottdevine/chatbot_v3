@@ -1,0 +1,21 @@
+# TODO
+
+- [x] Replace placeholder email address in `src/tool_orchestrator.py` with a valid email.
+- [x] Resolve dependency conflicts caused by biopython installation (numpy version incompatibility).
+- [x] Implement Web Search functionality in `src/tool_orchestrator.py`.
+- [x] Implement EvaluatorAgent to assess context quality.
+- [x] Implement FinishingAgent to synthesize a final response.
+- [x] Implement more robust PubMed query logic.
+- [x] Implement more robust Web Search logic.
+- [x] Implement EvaluatorAgent to assess context quality.
+- [x] Implement FinishingAgent to synthesize a final response.
+- [x] Add error handling and logging.
+- [x] Build a user interface.
+- [x] Fix 'bs4' module not found error for Web Search.
+- [x] Implement Conversation History display in UI.
+- [x] Implement Tool Usage Transparency in UI/backend.
+- [x] Implement Detailed Citation Display in UI/backend.
+- [ ] Implement Document Upload Interface.
+- [ ] Implement Vector Store Selection in UI/backend.
+- [ ] Implement Authentication and User Management.
+- [ ] Implement Document Management Interface.
