@@ -1,7 +1,9 @@
 import sys
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 import os
+import dotenv
 from flask import Flask, request, jsonify, render_template
+from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
 
 login_manager = LoginManager()
@@ -35,7 +37,7 @@ except ImportError as e:
     # or that the project structure allows this import.
     raise
 
-UPLOAD_FOLDER = 'uploads'
+UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", 'uploads')
 # In-memory user store (insecure for production!)
 users = {'testuser': {'password': 'password'}}
 app = Flask(__name__)
@@ -76,28 +78,14 @@ def upload():
         filename = secure_filename(file.filename)
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         try:
-            with open(filepath, 'r') as f:
-                file_content = f.read()
-            if filename.endswith('.txt'):
-                text = file_content
-                print(f"Extracted text from {filename}: {text[:100]}...")
-            elif filename.endswith('.pdf'):
-                from PyPDF2 import PdfReader
-                reader = PdfReader(f)
-                text = ""
-                for page in reader.pages:
-                    text += page.extract_text()
-                print(f"Extracted text from {filename}: {text[:100]}...")
-            else:
-                print(f"Skipping unsupported file type: {filename}")
-                return jsonify({'error': 'Unsupported file type'}), 400
-        except Exception as e:
-            print(f"Error reading file {filename}: {e}")
-            return jsonify({'error': f'Error reading file: {e}'}), 500
-
-        try:
             file.save(filepath)
-            return jsonify({'message': 'File uploaded successfully'}), 200
+            # Add document to vector store
+            try:
+                central_agent.orchestrator.execute_tools(["VectorStore"], {"file_path": filepath, "add": True})
+            except Exception as e:
+                print(f"Error adding document to vector store: {e}")
+                return jsonify({'error': f'Error adding document to vector store: {e}'}), 500
+            return jsonify({'message': 'File uploaded and added to vector store successfully', 'filename': filename}), 200
         except Exception as e:
             return jsonify({'error': f'Error saving file: {e}'}), 500
     else:
@@ -147,9 +135,61 @@ def select_vector_store():
 
     return jsonify({'message': 'Selection received'}), 200
 
-if __name__ == '__main__':
-    # Note: Debug mode should be False in production
-    app.run(debug=True, port=5001) # Using port 5001 to avoid potential conflicts
+@app.route('/api/vector_store/documents', methods=['GET'])
+def get_vector_store_documents():
+    """Retrieves a list of documents from the vector store."""
+    if not central_agent:
+        return jsonify({"error": "Chatbot agent not initialized"}), 500
+    try:
+        documents = central_agent.get_documents()
+        return jsonify({"documents": documents}), 200
+    except Exception as e:
+        print(f"Error retrieving documents: {e}")
+        return jsonify({"error": f"Error retrieving documents: {e}"}), 500
+
+@app.route('/api/vector_store/documents/<doc_id>', methods=['DELETE'])
+def delete_vector_store_document(doc_id):
+    """Deletes a document from the vector store."""
+    if not central_agent or not central_agent.orchestrator.collection:
+        return jsonify({"error": "Chatbot agent or collection not initialized"}), 500
+    try:
+        central_agent.orchestrator.collection.delete(ids=[doc_id])
+        return jsonify({"message": "Document deleted successfully"}), 200
+    except Exception as e:
+        print(f"Error deleting document: {e}")
+        return jsonify({"error": "Failed to delete document"}), 500
+def delete_vector_store_document(doc_id):
+    """Deletes a document from the vector store."""
+    if not central_agent:
+        return jsonify({"error": "Chatbot agent not initialized"}), 500
+    try:
+        central_agent.delete_document(doc_id)
+        return jsonify({"message": f"Document {doc_id} deleted successfully"}), 200
+    except Exception as e:
+        print(f"Error deleting document: {e}")
+        return jsonify({"error": f"Error deleting document: {e}"}), 500
+
+@app.route('/api/vector_store/status', methods=['GET'])
+def get_vector_store_status():
+    """Retrieves the status of the vector store."""
+    if not central_agent or not central_agent.orchestrator.collection:
+        return jsonify({"error": "Chatbot agent or collection not initialized"}), 500
+    try:
+        count = central_agent.orchestrator.collection.count()
+        return jsonify({"status": {"document_count": count}}), 200
+    except Exception as e:
+        print(f"Error getting vector store status: {e}")
+        return jsonify({"error": "Failed to get vector store status"}), 500
+def get_vector_store_status():
+    """Retrieves the status of the vector store."""
+    if not central_agent:
+        return jsonify({"error": "Chatbot agent not initialized"}), 500
+    try:
+        status = central_agent.get_vector_store_status()
+        return jsonify({"status": status}), 200
+    except Exception as e:
+        print(f"Error getting vector store status: {e}")
+        return jsonify({"error": f"Error getting vector store status: {e}"}), 500
 
 @app.route('/list_documents', methods=['GET'])
 def list_documents():
@@ -162,5 +202,17 @@ def list_documents():
         return jsonify({'documents': filenames})
     except OSError:
         return jsonify({'error': 'Could not list directory contents.'}), 500
-# Note: Debug mode should be False in production
-app.run(debug=True, port=5001) # Using port 5001 to avoid potential conflicts
+
+@app.route('/api/settings', methods=['GET'])
+def get_settings():
+    """Placeholder for retrieving settings."""
+    return jsonify({"message": "Settings endpoint not implemented yet"}), 200
+
+@app.route('/api/settings', methods=['POST'])
+def update_settings():
+    """Placeholder for updating settings."""
+    return jsonify({"message": "Settings endpoint not implemented yet"}), 200
+
+if __name__ == '__main__':
+    # Note: Debug mode should be False in production
+    app.run(debug=True, port=5001) # Using port 5001 to avoid potential conflicts

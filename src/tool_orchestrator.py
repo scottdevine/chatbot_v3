@@ -1,4 +1,5 @@
 import chromadb
+import os
 import logging
 from typing import List
 from Bio import Entrez
@@ -7,7 +8,10 @@ import requests
 # Configure basic logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-Entrez.email = "your_email@example.com"  # Replace with your email address
+ENTREZ_EMAIL = os.getenv("ENTREZ_EMAIL")
+if not ENTREZ_EMAIL:
+    raise ValueError("ENTREZ_EMAIL environment variable not set.")
+Entrez.email = ENTREZ_EMAIL
 
 class ToolOrchestrator:
     def __init__(self):

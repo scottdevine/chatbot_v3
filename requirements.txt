@@ -1,3 +1,4 @@
 Flask
 langchain
 pypdf2
+python-dotenv

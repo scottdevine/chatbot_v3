@@ -31,20 +31,27 @@
             font-family: sans-serif;
             margin: 20px;
         }
-        #chatbox {
-            margin-top: 20px;
+
+        #documentListSection {
+            margin-bottom: 20px;
             border: 1px solid #ccc;
             padding: 10px;
-            min-height: 100px;
-            background-color: #f9f9f9;
         }
-        #queryInput {
-            width: 80%;
-            padding: 8px;
-            margin-right: 5px;
+
+        #documentList {
+            list-style-type: none;
+            padding: 0;
         }
-        button {
-            padding: 8px 15px;
+
+        #documentList li {
+            margin-bottom: 5px;
+        }
+
+        #uploadStatus {
+            margin-top: 10px;
+            padding: 5px;
+            border: 1px solid #ccc;
+            background-color: #f0f0f0;
         }
     </style>
 </head>
@@ -65,28 +72,75 @@
     </div>
 
     <div style="margin-top: 20px;">
-        <label>Active Vector Store:</label>
+    <div style="margin-top: 20px;">
+        <label>Total Documents:</label>
         <span id="activeVectorStore">Loading...</span>
     </div>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            const activeVectorStoreSpan = document.getElementById('activeVectorStore');
+            const refreshDocListBtn = document.getElementById('refreshDocListBtn');
+            const documentList = document.getElementById('documentList');
+            const vectorStoreStatus = document.getElementById('vectorStoreStatus');
 
-            async function fetchVectorStoreType() {
+            async function fetchAndDisplayDocuments() {
                 try {
-                    const response = await fetch('/config/vector_store');
+                    const response = await fetch('/api/vector_store/documents');
                     if (!response.ok) {
                         throw new Error(`HTTP error! status: ${response.status}`);
                     }
                     const data = await response.json();
-                    activeVectorStoreSpan.textContent = data.vector_store_type || 'Unknown';
+
+                    if (Array.isArray(data.documents)) {
+                        documentList.innerHTML = '';
+                        data.documents.forEach(doc => {
+                            const listItem = document.createElement('li');
+                            listItem.textContent = doc.name;
+                            const deleteButton = document.createElement('button');
+                            deleteButton.textContent = 'Delete';
+                            deleteButton.addEventListener('click', async () => {
+                                try {
+                                    const deleteResponse = await fetch(`/api/vector_store/documents/${doc.id}`, {
+                                        method: 'DELETE'
+                                    });
+                                    if (!deleteResponse.ok) {
+                                        throw new Error(`HTTP error! status: ${deleteResponse.status}`);
+                                    }
+                                    fetchAndDisplayDocuments();
+                                } catch (error) {
+                                    console.error('Error deleting document:', error);
+                                }
+                            });
+                            listItem.appendChild(deleteButton);
+                            documentList.appendChild(listItem);
+                        });
+                    } else {
+                        documentList.innerHTML = '<li>No documents found.</li>';
+                    }
                 } catch (error) {
-                    console.error('Error fetching vector store type:', error);
-                    activeVectorStoreSpan.textContent = 'Error loading';
+                    console.error('Failed to fetch or display documents:', error);
+                    documentList.innerHTML = '<li>Error loading documents.</li>';
                 }
             }
 
-            fetchVectorStoreType();
+            async function fetchVectorStoreStatus() {
+                try {
+                    const response = await fetch('/api/vector_store/status');
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    const data = await response.json();
+                    vectorStoreStatus.textContent = `Total Documents: ${data.total_documents}`;
+                } catch (error) {
+                    console.error('Error fetching vector store status:', error);
+                    vectorStoreStatus.textContent = 'Error loading status';
+                }
+            }
+
+            refreshDocListBtn.addEventListener('click', fetchAndDisplayDocuments);
+
+            // Initial load
+            fetchAndDisplayDocuments();
+            fetchVectorStoreStatus();
         });
     </script>
 
@@ -100,6 +154,181 @@
         document.addEventListener('DOMContentLoaded', function() {
             const refreshDocListBtn = document.getElementById('refreshDocListBtn');
             const documentList = document.getElementById('documentList');
+            const vectorStoreStatus = document.getElementById('vectorStoreStatus');
+        
+            async function fetchAndDisplayDocuments() {
+                try {
+                    const response = await fetch('/api/vector_store/documents');
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    const data = await response.json();
+        
+                    if (Array.isArray(data.documents)) {
+                        documentList.innerHTML = '';
+                        data.documents.forEach(doc => {
+                            const listItem = document.createElement('li');
+                            listItem.textContent = doc.name;
+                            const deleteButton = document.createElement('button');
+                            deleteButton.textContent = 'Delete';
+                            deleteButton.addEventListener('click', async () => {
+                                try {
+                                    const deleteResponse = await fetch(`/api/vector_store/documents/${doc.id}`, {
+                                        method: 'DELETE'
+                                    });
+                                    if (!deleteResponse.ok) {
+                                        throw new Error(`HTTP error! status: ${deleteResponse.status}`);
+                                    }
+                                    fetchAndDisplayDocuments();
+                                } catch (error) {
+                                    console.error('Error deleting document:', error);
+                                }
+                            });
+                            listItem.appendChild(deleteButton);
+                            documentList.appendChild(listItem);
+                        });
+                    } else {
+                        documentList.innerHTML = '<li>No documents found.</li>';
+                    }
+                } catch (error) {
+                    console.error('Failed to fetch or display documents:', error);
+                    documentList.innerHTML = '<li>Error loading documents.</li>';
+                }
+            }
+        
+            async function fetchVectorStoreStatus() {
+                try {
+                    const response = await fetch('/api/vector_store/status');
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    const data = await response.json();
+                    vectorStoreStatus.textContent = `Total Documents: ${data.total_documents}`;
+                } catch (error) {
+                    console.error('Error fetching vector store status:', error);
+                    vectorStoreStatus.textContent = 'Error loading status';
+                }
+            }
+        
+            refreshDocListBtn.addEventListener('click', fetchAndDisplayDocuments);
+        
+            // Initial load
+            fetchAndDisplayDocuments();
+            fetchVectorStoreStatus();
+        
+            document.getElementById('chatForm').addEventListener('submit', async function(event) {
+                event.preventDefault(); // Prevent default form submission
+        
+                const uploadStatus = document.getElementById('uploadStatus');
+                const chatbox = document.getElementById('chatbox');
+        
+                const formData = new FormData();
+                const fileInput = document.getElementById('documentInput');
+                if (fileInput.files.length > 0) {
+                    formData.append('document', fileInput.files[0]);
+                } else {
+                    uploadStatus.textContent = 'Please select a file.';
+                    return;
+                }
+        
+                uploadStatus.textContent = 'Uploading...';
+        
+                try {
+                    const response = await fetch('/upload', {
+                        method: 'POST',
+                        body: formData,
+                    });
+        
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        uploadStatus.textContent = `Error: ${errorData.error || 'Upload failed'}`;
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+        
+                    const data = await response.json();
+                    uploadStatus.textContent = data.message || 'Upload successful!';
+                    fetchAndDisplayDocuments(); // Refresh document list after upload
+                } catch (error) {
+                    console.error('Error uploading file:', error);
+                    uploadStatus.textContent = `Error: ${error.message}`;
+                }
+            });
+        
+        
+        
+            refreshDocListBtn.addEventListener('click', fetchAndDisplayDocuments);
+        
+            // Initial load
+            fetchAndDisplayDocuments();
+            fetchVectorStoreStatus();
+            // Remove these lines as they are already declared above
+        
+        
+        
+            refreshDocListBtn.addEventListener('click', fetchAndDisplayDocuments);
+        
+            // Initial load
+            fetchAndDisplayDocuments();
+            fetchVectorStoreStatus();
+            // Remove these lines as they are already declared above
+        
+            async function fetchAndDisplayDocuments() {
+                try {
+                    const response = await fetch('/api/vector_store/documents');
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    const data = await response.json();
+        
+                    if (Array.isArray(data.documents)) {
+                        documentList.innerHTML = '';
+                        data.documents.forEach(doc => {
+                            const listItem = document.createElement('li');
+                            listItem.textContent = doc.name;
+                            const deleteButton = document.createElement('button');
+                            deleteButton.textContent = 'Delete';
+                            deleteButton.addEventListener('click', async () => {
+                                try {
+                                    const deleteResponse = await fetch(`/api/vector_store/documents/${doc.id}`, {
+                                        method: 'DELETE'
+                                    });
+                                    if (!deleteResponse.ok) {
+                                        throw new Error(`HTTP error! status: ${deleteResponse.status}`);
+                                    }
+                                    fetchAndDisplayDocuments();
+                                } catch (error) {
+                                    console.error('Error deleting document:', error);
+                                }
+                            });
+                            listItem.appendChild(deleteButton);
+                            documentList.appendChild(listItem);
+                        });
+                    } else {
+                        documentList.innerHTML = '<li>No documents found.</li>';
+                    }
+                } catch (error) {
+                    console.error('Failed to fetch or display documents:', error);
+                    documentList.innerHTML = '<li>Error loading documents.</li>';
+                }
+            }
+        
+            async function fetchVectorStoreStatus() {
+                try {
+                    const response = await fetch('/api/vector_store/status');
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    const data = await response.json();
+                    vectorStoreStatus.textContent = `Total Documents: ${data.total_documents}`;
+                } catch (error) {
+                    console.error('Error fetching vector store status:', error);
+                    vectorStoreStatus.textContent = 'Error loading status';
+                }
+            }
+        
+            fetchVectorStoreStatus();
+            // Remove this line as it is already declared above
+            // Remove this line as it is already declared above
 
             async function fetchAndDisplayDocuments() {
                 try {
@@ -133,10 +362,9 @@
     </script>
         document.getElementById('chatForm').addEventListener('submit', async function(event) {
             event.preventDefault(); // Prevent default form submission
-
+        
             const uploadStatus = document.getElementById('uploadStatus');
-            const chatbox = document.getElementById('chatbox');
-
+        
             const formData = new FormData();
             const fileInput = document.getElementById('documentInput');
             if (fileInput.files.length > 0) {
@@ -145,28 +373,29 @@
                 uploadStatus.textContent = 'Please select a file.';
                 return;
             }
-
+        
             uploadStatus.textContent = 'Uploading...';
-
+        
             try {
                 const response = await fetch('/upload', {
                     method: 'POST',
                     body: formData,
                 });
-
+        
                 if (!response.ok) {
                     const errorData = await response.json();
                     uploadStatus.textContent = `Error: ${errorData.error || 'Upload failed'}`;
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
-
+        
                 const data = await response.json();
                 uploadStatus.textContent = data.message || 'Upload successful!';
-
+                fetchAndDisplayDocuments(); // Refresh document list after upload
             } catch (error) {
                 console.error('Error uploading file:', error);
                 uploadStatus.textContent = `Error: ${error.message}`;
             }
+        });
         });
 
         // Handle vector store selection change
