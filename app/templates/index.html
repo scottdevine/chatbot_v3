@@ -4,58 +4,65 @@
     <title>Chatbot</title>
 </head>
 <body>
-    {% if current_user.is_authenticated %}
-        <p>Logged in as: {{ current_user.id }}</p>
-        <a href="/logout">Logout</a>
-    {% else %}
-        <form action="/login" method="post">
-            <label for="username">Username:</label>
-            <input type="text" id="username" name="username"><br><br>
-            <label for="password">Password:</label>
-            <input type="password" id="password" name="password"><br><br>
-            <input type="submit" value="Login">
-        </form>
-    {% endif %}
+    <!-- Login section removed -->
 
     <h1>Chatbot</h1>
     <!-- Rest of your HTML content -->
 </body>
 </html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RAG Chatbot</title>
+    <!-- Removed duplicate HTML head and body start -->
     <style>
         body {
             font-family: sans-serif;
             margin: 20px;
         }
-
-        #documentListSection {
+        #chatForm, #documentListSection, #chatInterface {
             margin-bottom: 20px;
             border: 1px solid #ccc;
-            padding: 10px;
+            padding: 15px;
+            border-radius: 5px;
         }
-
         #documentList {
             list-style-type: none;
             padding: 0;
         }
-
         #documentList li {
             margin-bottom: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
-
-        #uploadStatus {
+        #documentList button {
+            margin-left: 10px;
+            cursor: pointer;
+        }
+        #uploadStatus, #chatbox {
             margin-top: 10px;
+            padding: 10px;
+            border: 1px solid #eee;
+            background-color: #f9f9f9;
+            min-height: 50px;
+            border-radius: 3px;
+        }
+        #chatbox p {
+            margin: 5px 0;
+        }
+        #chatbox strong {
+            display: block;
+            margin-bottom: 3px;
+        }
+        #vectorStoreStatus {
+            font-weight: bold;
+        }
+        button {
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+        input[type="text"], input[type="file"] {
             padding: 5px;
-            border: 1px solid #ccc;
-            background-color: #f0f0f0;
+            margin-right: 5px;
         }
     </style>
-</head>
-<body>
 
     <h1>RAG Chatbot Interface</h1>
 
@@ -71,50 +78,54 @@
         <ul id="documentList"></ul>
     </div>
 
-    <div style="margin-top: 20px;">
-    <div style="margin-top: 20px;">
-        <label>Total Documents:</label>
-        <span id="activeVectorStore">Loading...</span>
+    <div id="vectorStoreStatusSection">
+        <h2>Vector Store Status</h2>
+        <p id="vectorStoreStatus">Loading status...</p>
     </div>
+
+    <div id="chatInterface">
+        <h2>Chat</h2>
+        <div id="chatbox"></div>
+        <input type="text" id="queryInput" placeholder="Enter your query">
+        <button id="sendQueryBtn">Send Query</button>
+    </div>
+    <!-- Combined and corrected script -->
+
+    <!-- Removed duplicate Response section -->
+
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            const chatForm = document.getElementById('chatForm');
+            const documentInput = document.getElementById('documentInput');
+            const uploadStatus = document.getElementById('uploadStatus');
             const refreshDocListBtn = document.getElementById('refreshDocListBtn');
             const documentList = document.getElementById('documentList');
             const vectorStoreStatus = document.getElementById('vectorStoreStatus');
+            const queryInput = document.getElementById('queryInput');
+            const sendQueryBtn = document.getElementById('sendQueryBtn');
+            const chatbox = document.getElementById('chatbox');
 
+            // --- Document Management Functions ---
             async function fetchAndDisplayDocuments() {
+                documentList.innerHTML = '<li>Loading documents...</li>';
                 try {
                     const response = await fetch('/api/vector_store/documents');
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                     const data = await response.json();
 
-                    if (Array.isArray(data.documents)) {
-                        documentList.innerHTML = '';
+                    documentList.innerHTML = ''; // Clear list
+                    if (Array.isArray(data.documents) && data.documents.length > 0) {
                         data.documents.forEach(doc => {
                             const listItem = document.createElement('li');
-                            listItem.textContent = doc.name;
+                            listItem.textContent = doc.name || `Document ID: ${doc.id}`; // Use name or ID
                             const deleteButton = document.createElement('button');
                             deleteButton.textContent = 'Delete';
-                            deleteButton.addEventListener('click', async () => {
-                                try {
-                                    const deleteResponse = await fetch(`/api/vector_store/documents/${doc.id}`, {
-                                        method: 'DELETE'
-                                    });
-                                    if (!deleteResponse.ok) {
-                                        throw new Error(`HTTP error! status: ${deleteResponse.status}`);
-                                    }
-                                    fetchAndDisplayDocuments();
-                                } catch (error) {
-                                    console.error('Error deleting document:', error);
-                                }
-                            });
+                            deleteButton.onclick = () => deleteDocument(doc.id);
                             listItem.appendChild(deleteButton);
                             documentList.appendChild(listItem);
                         });
                     } else {
-                        documentList.innerHTML = '<li>No documents found.</li>';
+                        documentList.innerHTML = '<li>No documents found in vector store.</li>';
                     }
                 } catch (error) {
                     console.error('Failed to fetch or display documents:', error);
@@ -122,308 +133,112 @@
                 }
             }
 
+            async function deleteDocument(docId) {
+                if (!confirm(`Are you sure you want to delete document ${docId}?`)) return;
+                try {
+                    const response = await fetch(`/api/vector_store/documents/${docId}`, { method: 'DELETE' });
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    fetchAndDisplayDocuments();
+                    fetchVectorStoreStatus();
+                } catch (error) {
+                    console.error('Error deleting document:', error);
+                    alert('Failed to delete document.');
+                }
+            }
+
             async function fetchVectorStoreStatus() {
+                vectorStoreStatus.textContent = 'Loading status...';
                 try {
                     const response = await fetch('/api/vector_store/status');
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                     const data = await response.json();
-                    vectorStoreStatus.textContent = `Total Documents: ${data.total_documents}`;
+                    vectorStoreStatus.textContent = `Total Documents: ${data.status?.document_count ?? 'N/A'}`;
                 } catch (error) {
                     console.error('Error fetching vector store status:', error);
                     vectorStoreStatus.textContent = 'Error loading status';
                 }
             }
 
-            refreshDocListBtn.addEventListener('click', fetchAndDisplayDocuments);
-
-            // Initial load
-            fetchAndDisplayDocuments();
-            fetchVectorStoreStatus();
-        });
-    </script>
-
-    <h2>Response:</h2>
-    <div id="uploadStatus"></div>
-    <div id="chatbox">
-        <!-- Chatbot response will appear here -->
-    </div>
-
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const refreshDocListBtn = document.getElementById('refreshDocListBtn');
-            const documentList = document.getElementById('documentList');
-            const vectorStoreStatus = document.getElementById('vectorStoreStatus');
-        
-            async function fetchAndDisplayDocuments() {
-                try {
-                    const response = await fetch('/api/vector_store/documents');
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-                    const data = await response.json();
-        
-                    if (Array.isArray(data.documents)) {
-                        documentList.innerHTML = '';
-                        data.documents.forEach(doc => {
-                            const listItem = document.createElement('li');
-                            listItem.textContent = doc.name;
-                            const deleteButton = document.createElement('button');
-                            deleteButton.textContent = 'Delete';
-                            deleteButton.addEventListener('click', async () => {
-                                try {
-                                    const deleteResponse = await fetch(`/api/vector_store/documents/${doc.id}`, {
-                                        method: 'DELETE'
-                                    });
-                                    if (!deleteResponse.ok) {
-                                        throw new Error(`HTTP error! status: ${deleteResponse.status}`);
-                                    }
-                                    fetchAndDisplayDocuments();
-                                } catch (error) {
-                                    console.error('Error deleting document:', error);
-                                }
-                            });
-                            listItem.appendChild(deleteButton);
-                            documentList.appendChild(listItem);
-                        });
-                    } else {
-                        documentList.innerHTML = '<li>No documents found.</li>';
-                    }
-                } catch (error) {
-                    console.error('Failed to fetch or display documents:', error);
-                    documentList.innerHTML = '<li>Error loading documents.</li>';
-                }
-            }
-        
-            async function fetchVectorStoreStatus() {
-                try {
-                    const response = await fetch('/api/vector_store/status');
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-                    const data = await response.json();
-                    vectorStoreStatus.textContent = `Total Documents: ${data.total_documents}`;
-                } catch (error) {
-                    console.error('Error fetching vector store status:', error);
-                    vectorStoreStatus.textContent = 'Error loading status';
-                }
-            }
-        
-            refreshDocListBtn.addEventListener('click', fetchAndDisplayDocuments);
-        
-            // Initial load
-            fetchAndDisplayDocuments();
-            fetchVectorStoreStatus();
-        
-            document.getElementById('chatForm').addEventListener('submit', async function(event) {
-                event.preventDefault(); // Prevent default form submission
-        
-                const uploadStatus = document.getElementById('uploadStatus');
-                const chatbox = document.getElementById('chatbox');
-        
-                const formData = new FormData();
-                const fileInput = document.getElementById('documentInput');
-                if (fileInput.files.length > 0) {
-                    formData.append('document', fileInput.files[0]);
-                } else {
+            // --- Upload Function ---
+            chatForm.addEventListener('submit', async function(event) {
+                event.preventDefault();
+                if (documentInput.files.length === 0) {
                     uploadStatus.textContent = 'Please select a file.';
                     return;
                 }
-        
+                const formData = new FormData();
+                formData.append('document', documentInput.files[0]);
                 uploadStatus.textContent = 'Uploading...';
-        
                 try {
-                    const response = await fetch('/upload', {
-                        method: 'POST',
-                        body: formData,
-                    });
-        
+                    const response = await fetch('/upload', { method: 'POST', body: formData });
+                    const data = await response.json();
                     if (!response.ok) {
-                        const errorData = await response.json();
-                        uploadStatus.textContent = `Error: ${errorData.error || 'Upload failed'}`;
+                        uploadStatus.textContent = `Error: ${data.error || 'Upload failed'}`;
                         throw new Error(`HTTP error! status: ${response.status}`);
                     }
-        
-                    const data = await response.json();
                     uploadStatus.textContent = data.message || 'Upload successful!';
-                    fetchAndDisplayDocuments(); // Refresh document list after upload
+                    documentInput.value = '';
+                    fetchAndDisplayDocuments();
+                    fetchVectorStoreStatus();
                 } catch (error) {
                     console.error('Error uploading file:', error);
-                    uploadStatus.textContent = `Error: ${error.message}`;
+                    if (!uploadStatus.textContent.startsWith('Error:')) {
+                         uploadStatus.textContent = `Error: ${error.message}`;
+                    }
                 }
             });
-        
-        
-        
-            refreshDocListBtn.addEventListener('click', fetchAndDisplayDocuments);
-        
+
+            // --- Chat Function ---
+            async function sendQuery() {
+                 const query = queryInput.value.trim();
+                if (!query) return;
+
+                chatbox.innerHTML += `<p><strong>You:</strong> ${query}</p>`;
+                queryInput.value = '';
+
+                try {
+                    const response = await fetch('/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ query: query })
+                    });
+                    const data = await response.json();
+                    if (!response.ok) {
+                         chatbox.innerHTML += `<p><strong>Error:</strong> ${data.error || 'Failed to get response'}</p>`;
+                         throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    chatbox.innerHTML += `<p><strong>Bot:</strong> ${data.response}</p>`;
+                    // Optionally display sources/tools
+                } catch (error) {
+                    console.error('Error sending query:', error);
+                     if (!chatbox.innerHTML.includes('<strong>Error:</strong>')) {
+                        chatbox.innerHTML += `<p><strong>Error:</strong> Could not get response.</p>`;
+                     }
+                }
+                 chatbox.scrollTop = chatbox.scrollHeight;
+            }
+
+            sendQueryBtn.addEventListener('click', sendQuery);
+            queryInput.addEventListener('keypress', function(event) {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    sendQuery();
+                }
+            });
+
+            // --- Event Listeners & Initial Load ---
+            refreshDocListBtn.addEventListener('click', () => {
+                 fetchAndDisplayDocuments();
+                 fetchVectorStoreStatus();
+            });
+
             // Initial load
             fetchAndDisplayDocuments();
             fetchVectorStoreStatus();
-            // Remove these lines as they are already declared above
-        
-        
-        
-            refreshDocListBtn.addEventListener('click', fetchAndDisplayDocuments);
-        
-            // Initial load
-            fetchAndDisplayDocuments();
-            fetchVectorStoreStatus();
-            // Remove these lines as they are already declared above
-        
-            async function fetchAndDisplayDocuments() {
-                try {
-                    const response = await fetch('/api/vector_store/documents');
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-                    const data = await response.json();
-        
-                    if (Array.isArray(data.documents)) {
-                        documentList.innerHTML = '';
-                        data.documents.forEach(doc => {
-                            const listItem = document.createElement('li');
-                            listItem.textContent = doc.name;
-                            const deleteButton = document.createElement('button');
-                            deleteButton.textContent = 'Delete';
-                            deleteButton.addEventListener('click', async () => {
-                                try {
-                                    const deleteResponse = await fetch(`/api/vector_store/documents/${doc.id}`, {
-                                        method: 'DELETE'
-                                    });
-                                    if (!deleteResponse.ok) {
-                                        throw new Error(`HTTP error! status: ${deleteResponse.status}`);
-                                    }
-                                    fetchAndDisplayDocuments();
-                                } catch (error) {
-                                    console.error('Error deleting document:', error);
-                                }
-                            });
-                            listItem.appendChild(deleteButton);
-                            documentList.appendChild(listItem);
-                        });
-                    } else {
-                        documentList.innerHTML = '<li>No documents found.</li>';
-                    }
-                } catch (error) {
-                    console.error('Failed to fetch or display documents:', error);
-                    documentList.innerHTML = '<li>Error loading documents.</li>';
-                }
-            }
-        
-            async function fetchVectorStoreStatus() {
-                try {
-                    const response = await fetch('/api/vector_store/status');
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-                    const data = await response.json();
-                    vectorStoreStatus.textContent = `Total Documents: ${data.total_documents}`;
-                } catch (error) {
-                    console.error('Error fetching vector store status:', error);
-                    vectorStoreStatus.textContent = 'Error loading status';
-                }
-            }
-        
-            fetchVectorStoreStatus();
-            // Remove this line as it is already declared above
-            // Remove this line as it is already declared above
-
-            async function fetchAndDisplayDocuments() {
-                try {
-                    const response = await fetch('/list_documents');
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-                    const data = await response.json();
-
-                    if (Array.isArray(data.documents)) {
-                        documentList.innerHTML = '';
-                        data.documents.forEach(filename => {
-                            const listItem = document.createElement('li');
-                            listItem.textContent = filename;
-                            documentList.appendChild(listItem);
-                        });
-                    } else {
-                        documentList.innerHTML = '<li>No documents found.</li>';
-                    }
-                } catch (error) {
-                    console.error('Failed to fetch or display documents:', error);
-                    documentList.innerHTML = '<li>Error loading documents.</li>';
-                }
-            }
-
-            refreshDocListBtn.addEventListener('click', fetchAndDisplayDocuments);
-
-            // Initial load
-            fetchAndDisplayDocuments();
-        });
-    </script>
-        document.getElementById('chatForm').addEventListener('submit', async function(event) {
-            event.preventDefault(); // Prevent default form submission
-        
-            const uploadStatus = document.getElementById('uploadStatus');
-        
-            const formData = new FormData();
-            const fileInput = document.getElementById('documentInput');
-            if (fileInput.files.length > 0) {
-                formData.append('document', fileInput.files[0]);
-            } else {
-                uploadStatus.textContent = 'Please select a file.';
-                return;
-            }
-        
-            uploadStatus.textContent = 'Uploading...';
-        
-            try {
-                const response = await fetch('/upload', {
-                    method: 'POST',
-                    body: formData,
-                });
-        
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    uploadStatus.textContent = `Error: ${errorData.error || 'Upload failed'}`;
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-        
-                const data = await response.json();
-                uploadStatus.textContent = data.message || 'Upload successful!';
-                fetchAndDisplayDocuments(); // Refresh document list after upload
-            } catch (error) {
-                console.error('Error uploading file:', error);
-                uploadStatus.textContent = `Error: ${error.message}`;
-            }
-        });
-        });
-
-        // Handle vector store selection change
-        const vectorStoreSelect = document.getElementById('vectorStoreSelect');
-        vectorStoreSelect.addEventListener('change', async function(event) {
-            const selectedValue = event.target.value;
-            console.log(`Selected vector store: ${selectedValue}`);
-
-            try {
-                const response = await fetch('/select_vector_store', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ selected_store: selectedValue }),
-                });
-
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-
-                const result = await response.json();
-                console.log('Vector store selection sent successfully:', result);
-            } catch (error) {
-                console.error('Error sending vector store selection:', error);
-            }
-        });
+        }); // This is the correct closing tag for DOMContentLoaded
     </script>
 
-    </body>
+    <!-- Removed duplicate Response section -->
+
+    <!-- Removed duplicate closing tags -->
 </html>

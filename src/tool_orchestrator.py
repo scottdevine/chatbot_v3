@@ -44,16 +44,19 @@ class ToolOrchestrator:
         for tool in tools:
             try:
                 if tool == "VectorStore":
-                    result = self.query_vector_store(query)
-                    results.append(result)
+                    tool_result_dict = self.query_vector_store(query)
+                    # Extract content string before appending
+                    results.append(tool_result_dict.get("contents", ["Vector Store Error"])[0])
                     logging.info(f"Successfully executed tool: {tool}")
                 elif tool == "PubMed":
-                    result = self.query_pubmed(query)
-                    results.append(result)
+                    tool_result_dict = self.query_pubmed(query)
+                    # Extract content string before appending
+                    results.append(tool_result_dict.get("contents", ["PubMed Error"])[0])
                     logging.info(f"Successfully executed tool: {tool}")
                 elif tool == "WebSearch":
-                    result = self.perform_web_search(query)
-                    results.append(result)
+                    tool_result_dict = self.perform_web_search(query)
+                    # Extract content string before appending
+                    results.append(tool_result_dict.get("contents", ["Web Search Error"])[0])
                     logging.info(f"Successfully executed tool: {tool}")
                 else:
                     logging.warning(f"Unknown tool requested: {tool}")

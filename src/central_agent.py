@@ -3,7 +3,7 @@ import logging
 import logging
 from typing import List, Dict, Tuple
 
-from src.tool_orchestrator import ToolOrchestrator
+from chatbot_v3.src.tool_orchestrator import ToolOrchestrator
 
 # Configure basic logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -42,11 +42,12 @@ class CentralAgent:
     def process_query(self, query: str) -> Tuple[str, list]:
         """Processes the user query and returns a response along with sources."""
         tools = ["VectorStore", "PubMed", "WebSearch"]
-        results = self.orchestrator.execute_tools(tools, query)
-        # Assuming orchestrator returns a dictionary with "contents" and "sources"
-        contents = results.get("contents", ["No content found."])
-        sources = results.get("sources", [])
-        return "\n".join(contents), sources
+        # execute_tools returns an aggregated string of results
+        response_string = self.orchestrator.execute_tools(tools, query)
+        # Source information is not directly available from the aggregated string
+        # Returning the string directly and an empty list for sources
+        sources = []
+        return response_string, sources
 
     def recognize_intent(self, query: str) -> str:
         # Placeholder for intent recognition logic

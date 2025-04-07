@@ -1,25 +1,31 @@
+# Add the parent directory to the Python path so imports work correctly
+import os
 import sys
-from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+# from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user # Removed login
 import os
 import dotenv
 from flask import Flask, request, jsonify, render_template
 from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
 
-login_manager = LoginManager()
-app = Flask(__name__)
-login_manager.init_app(app)
-login_manager.login_view = 'login'
+# login_manager = LoginManager() # Removed login
+app = Flask(__name__) # Keep this first app instance
+# Ensure UPLOAD_FOLDER is configured on the correct app instance
+UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", 'uploads')
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+# login_manager.init_app(app) # Removed login
+# login_manager.login_view = 'login' # Removed login
 
-class User(UserMixin):
-    def get(user_id):
-        # In a real application, this would fetch the user from a database
-        return None
+# class User(UserMixin): # Removed login
+#     def get(user_id):
+#         # In a real application, this would fetch the user from a database
+#         return None
 
-@login_manager.user_loader
-def load_user(user_id):
-    # In a real application, this would fetch the user from a database
-    return User()
+# @login_manager.user_loader # Removed login
+# def load_user(user_id):
+#     # In a real application, this would fetch the user from a database
+#     return User()
 
 # Add the project root directory to the Python path
 # This allows importing modules from the 'src' directory
@@ -28,7 +34,7 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 try:
-    from src.central_agent import CentralAgent
+    from chatbot_v3.src.central_agent import CentralAgent
 except ImportError as e:
     print(f"Error importing CentralAgent: {e}")
     # Provide a fallback or raise an error if CentralAgent is critical
@@ -38,18 +44,18 @@ except ImportError as e:
     raise
 
 UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", 'uploads')
-# In-memory user store (insecure for production!)
-users = {'testuser': {'password': 'password'}}
-app = Flask(__name__)
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-
+# # In-memory user store (insecure for production!) # Removed login
+# users = {'testuser': {'password': 'password'}} # Removed login
+# Remove redundant app initialization
+# app = Flask(__name__)
+# app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 # Initialize conversation history
 conversation_history = []
 
 # Initialize the CentralAgent (consider if it should be initialized per request or once)
 # For simplicity, initializing once here. If state needs to be reset, initialize per request.
 try:
-    central_agent = CentralAgent(vector_store_type=app.config.get('VECTOR_STORE_TYPE', 'in-memory'))
+    central_agent = CentralAgent()
 except Exception as e:
     print(f"Error initializing CentralAgent: {e}")
     # Handle initialization error appropriately
@@ -234,3 +240,8 @@ def update_settings():
         return jsonify({"message": "Settings updated successfully. Restart required for changes to take effect."}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+if __name__ == '__main__':
+    # Make sure to run on 0.0.0.0 to be accessible outside the container
+    # The port should match the one exposed in the Dockerfile and docker run command
+    app.run(host='0.0.0.0', port=5001, debug=True) # Use debug=True for development

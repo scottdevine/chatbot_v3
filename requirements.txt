@@ -1,4 +1,9 @@
+setuptools
 Flask
 langchain
 pypdf2
 python-dotenv
+chromadb
+numpy<2.0
+# Flask-Login # Removed login
+biopython
