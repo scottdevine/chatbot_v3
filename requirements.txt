@@ -1,4 +1,3 @@
-biopython
-chromadb
 Flask
-beautifulsoup4
+langchain
+pypdf2

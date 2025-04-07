@@ -16,7 +16,7 @@
 - [x] Implement Tool Usage Transparency in UI/backend.
 - [x] Implement Detailed Citation Display in UI/backend.
 - [x] Implement Document Upload Interface.
-- [ ] Implement Vector Store Selection in UI/backend.
-- [ ] Implement Authentication and User Management.
-- [ ] Implement Document Management Interface.
+- [x] Implement Vector Store Selection in UI/backend.
+- [x] Implement Authentication and User Management.
+- [x] Implement Document Management Interface.
 - [x] Implement document processing logic for uploads

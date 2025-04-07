@@ -1,7 +1,23 @@
 import sys
+from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 import os
 from flask import Flask, request, jsonify, render_template
 from werkzeug.utils import secure_filename
+
+login_manager = LoginManager()
+app = Flask(__name__)
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+
+class User(UserMixin):
+    def get(user_id):
+        # In a real application, this would fetch the user from a database
+        return None
+
+@login_manager.user_loader
+def load_user(user_id):
+    # In a real application, this would fetch the user from a database
+    return User()
 
 # Add the project root directory to the Python path
 # This allows importing modules from the 'src' directory
@@ -20,6 +36,8 @@ except ImportError as e:
     raise
 
 UPLOAD_FOLDER = 'uploads'
+# In-memory user store (insecure for production!)
+users = {'testuser': {'password': 'password'}}
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
@@ -29,7 +47,7 @@ conversation_history = []
 # Initialize the CentralAgent (consider if it should be initialized per request or once)
 # For simplicity, initializing once here. If state needs to be reset, initialize per request.
 try:
-    central_agent = CentralAgent()
+    central_agent = CentralAgent(vector_store_type=app.config.get('VECTOR_STORE_TYPE', 'in-memory'))
 except Exception as e:
     print(f"Error initializing CentralAgent: {e}")
     # Handle initialization error appropriately
@@ -61,11 +79,21 @@ def upload():
             with open(filepath, 'r') as f:
                 file_content = f.read()
             if filename.endswith('.txt'):
-                print(f"Extracted text from {filename}: {file_content[:100]}...")
+                text = file_content
+                print(f"Extracted text from {filename}: {text[:100]}...")
+            elif filename.endswith('.pdf'):
+                from PyPDF2 import PdfReader
+                reader = PdfReader(f)
+                text = ""
+                for page in reader.pages:
+                    text += page.extract_text()
+                print(f"Extracted text from {filename}: {text[:100]}...")
             else:
-                print(f"Skipping non-txt file: {filename}")
+                print(f"Skipping unsupported file type: {filename}")
+                return jsonify({'error': 'Unsupported file type'}), 400
         except Exception as e:
             print(f"Error reading file {filename}: {e}")
+            return jsonify({'error': f'Error reading file: {e}'}), 500
 
         try:
             file.save(filepath)
@@ -122,3 +150,17 @@ def select_vector_store():
 if __name__ == '__main__':
     # Note: Debug mode should be False in production
     app.run(debug=True, port=5001) # Using port 5001 to avoid potential conflicts
+
+@app.route('/list_documents', methods=['GET'])
+def list_documents():
+    """Lists the documents in the upload folder."""
+    upload_folder = app.config['UPLOAD_FOLDER']
+    if not os.path.exists(upload_folder):
+        return jsonify({'documents': [], 'message': 'Upload directory not found.'})
+    try:
+        filenames = os.listdir(upload_folder)
+        return jsonify({'documents': filenames})
+    except OSError:
+        return jsonify({'error': 'Could not list directory contents.'}), 500
+# Note: Debug mode should be False in production
+app.run(debug=True, port=5001) # Using port 5001 to avoid potential conflicts
