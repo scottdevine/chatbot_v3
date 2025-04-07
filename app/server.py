@@ -205,14 +205,32 @@ def list_documents():
 
 @app.route('/api/settings', methods=['GET'])
 def get_settings():
-    """Placeholder for retrieving settings."""
-    return jsonify({"message": "Settings endpoint not implemented yet"}), 200
+    """Retrieves current settings."""
+    settings = {
+        "UPLOAD_FOLDER": app.config['UPLOAD_FOLDER']
+    }
+    return jsonify(settings), 200
 
 @app.route('/api/settings', methods=['POST'])
 def update_settings():
-    """Placeholder for updating settings."""
-    return jsonify({"message": "Settings endpoint not implemented yet"}), 200
+    """Updates settings in the .env file."""
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No data provided"}), 400
 
-if __name__ == '__main__':
-    # Note: Debug mode should be False in production
-    app.run(debug=True, port=5001) # Using port 5001 to avoid potential conflicts
+    try:
+        # Load existing .env file
+        dotenv_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
+        load_dotenv(dotenv_path)
+
+        # Update settings
+        if 'ENTREZ_EMAIL' in data:
+            os.environ['ENTREZ_EMAIL'] = data['ENTREZ_EMAIL']
+            # Save changes to .env file
+            with open(dotenv_path, 'w') as f:
+                for key, value in os.environ.items():
+                    f.write(f"{key}={value}\n")
+
+        return jsonify({"message": "Settings updated successfully. Restart required for changes to take effect."}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
