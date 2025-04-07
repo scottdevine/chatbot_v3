@@ -31,11 +31,21 @@
     <h1>RAG Chatbot Interface</h1>
 
     <form id="chatForm">
-        <input type="text" id="queryInput" placeholder="Enter your query here..." required>
-        <button type="submit">Send</button>
+        <input type="file" id="documentInput">
+        <button type="submit">Upload Document</button>
     </form>
 
+    <div style="margin-top: 20px;">
+        <label for="vectorStoreSelect">Select Vector Store:</label>
+        <select id="vectorStoreSelect">
+            <option value="default">Default Store</option>
+            <option value="store_a">Store A</option>
+            <option value="store_b">Store B</option>
+        </select>
+    </div>
+
     <h2>Response:</h2>
+    <div id="uploadStatus"></div>
     <div id="chatbox">
         <!-- Chatbot response will appear here -->
     </div>
@@ -107,6 +117,32 @@
             } catch (error) {
                 console.error('Error sending query:', error);
                 chatbox.innerHTML += `<p style="color: red;"><strong>Error:</strong> ${error.message}</p>`;
+            }
+        });
+
+        // Handle vector store selection change
+        const vectorStoreSelect = document.getElementById('vectorStoreSelect');
+        vectorStoreSelect.addEventListener('change', async function(event) {
+            const selectedValue = event.target.value;
+            console.log(`Selected vector store: ${selectedValue}`);
+
+            try {
+                const response = await fetch('/select_vector_store', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ selected_store: selectedValue }),
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                console.log('Vector store selection sent successfully:', result);
+            } catch (error) {
+                console.error('Error sending vector store selection:', error);
             }
         });
     </script>

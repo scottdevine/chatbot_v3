@@ -15,7 +15,8 @@
 - [x] Implement Conversation History display in UI.
 - [x] Implement Tool Usage Transparency in UI/backend.
 - [x] Implement Detailed Citation Display in UI/backend.
-- [ ] Implement Document Upload Interface.
+- [x] Implement Document Upload Interface.
 - [ ] Implement Vector Store Selection in UI/backend.
 - [ ] Implement Authentication and User Management.
 - [ ] Implement Document Management Interface.
+- [x] Implement document processing logic for uploads
